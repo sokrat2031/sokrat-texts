@@ -3,6 +3,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 const axios = require('axios');
 const grayMatter = require('gray-matter');
+require('dotenv').config();
 
 const articlesDir = path.join(__dirname, 'articles');
 const targetLanguages = ['ru', 'uk', 'en']; // Target translation languages
