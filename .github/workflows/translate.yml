@@ -16,14 +16,12 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 20
+          node-version: 16
 
       - name: Install dependencies
         run: npm install
 
-      - name: Set environment variables
+      - name: Run translation script
         env:
           DEEPL_API_KEY: ${{ secrets.DEEPL_API_KEY }}
-
-      - name: Run translation script
         run: node translate_metadata.js
