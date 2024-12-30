@@ -4,11 +4,12 @@ on:
   push:
     paths:
       - 'articles/**'
+  workflow_dispatch:
 
 jobs:
   translate:
     runs-on: ubuntu-latest
-
+    environment: DeepL
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
