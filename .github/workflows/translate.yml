@@ -21,6 +21,11 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Check environment variable
+        run: echo "DEEPL_API_KEY is set"
+        env:
+          DEEPL_API_KEY: ${{ secrets.DEEPL_API_KEY }}
+
       - name: Run translation script
         env:
           DEEPL_API_KEY: ${{ secrets.DEEPL_API_KEY }}
