@@ -24,4 +24,4 @@ jobs:
       - name: Run translation script
         env:
           DEEPL_API_KEY: ${{ secrets.DEEPL_API_KEY }}
-        run: node translate_metadata.js
+        run: node translate.js
