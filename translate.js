@@ -6,12 +6,20 @@ const grayMatter = require('gray-matter');
 require('dotenv').config();
 
 const articlesDir = path.join(__dirname, 'articles');
-const targetLanguages = ['ru', 'uk', 'en']; // Target translation languages
+const targetLanguages = ['ru', 'uk', 'en', 'pl', 'de', 'es', 'fr']; // Target translation languages
 const apiKey = process.env.DEEPL_API_KEY;
 
 if (!apiKey) {
   console.error("ERROR: DeepL API key is missing. Set DEEPL_API_KEY in the environment.");
   process.exit(1);
+}
+
+const languageMapping = {
+  ua: 'UK',
+};
+
+function getKeyByValue(object, value) {
+  return Object.keys(object).find(key => object[key] === value) || value.toLowerCase();
 }
 
 /**
@@ -20,7 +28,7 @@ if (!apiKey) {
  */
 function getChangedFiles() {
   try {
-    const output = execSync('git diff --name-only HEAD articles/').toString();
+    const output = execSync('git diff --name-only origin/main..HEAD').toString();
     return output.split('\n').filter(file => file.endsWith('.md'));
   } catch (error) {
     console.error('Failed to get changed files from git:', error);
@@ -42,12 +50,10 @@ async function translateText(text, targetLang, sourceLang = null) {
       text,
       target_lang: targetLang,
     };
-
     if (sourceLang) {
-      params.source_lang = sourceLang;
+      params.source_lang = languageMapping?.[sourceLang.toLowerCase()] || sourceLang;
     }
-
-    const response = await axios.post('https://api.deepl.com/v2/translate', null, { params });
+    const response = await axios.post('https://api-free.deepl.com/v2/translate', null, { params });
     return response.data.translations[0].text;
   } catch (error) {
     console.error(`ERROR: Failed to translate text to ${targetLang}`, error.response?.data || error.message);
@@ -56,14 +62,58 @@ async function translateText(text, targetLang, sourceLang = null) {
 }
 
 /**
- * Update an existing translation
+ * Translate metadata fields
+ * @param {object} metadata - Metadata object to translate
+ * @param {string[]} fieldsToTranslate - Fields that need to be translated
+ * @param {string} targetLang - Target language for translation
+ * @param {string|null} sourceLang - Source language for translation
+ * @returns {object} - Translated metadata
+ */
+async function translateMetadata(metadata, fieldsToTranslate, targetLang, sourceLang) {
+  const translatedMetadata = { ...metadata };
+
+  for (const field of fieldsToTranslate) {
+    if (metadata[field]) {
+      try {
+        translatedMetadata[field] = await translateText(metadata[field], targetLang, sourceLang);
+      } catch (error) {
+        console.error(`Failed to translate metadata field \"${field}\":`, error);
+        translatedMetadata[field] = metadata[field]; // Fallback to original value
+      }
+    }
+  }
+
+  return translatedMetadata;
+}
+
+/**
+ * Synchronize translations with the original order
  * @param {string} originalText - Original text
  * @param {string} translatedText - Existing translated text
- * @param {string} newText - New text to be translated
- * @returns {string} - Updated translation
+ * @param {function} translateFn - Function to translate missing lines
+ * @returns {Promise<string>} - Updated translated text
  */
-function updateTranslation(originalText, translatedText, newText) {
-  return `${translatedText}\n\n${newText}`;
+async function synchronizeTranslations(originalText, translatedText, translateFn) {
+  const originalLines = originalText.split('\n');
+  const translatedLines = translatedText.split('\n').map(line => line.trim());
+  const updatedLines = [];
+
+  for (const line of originalLines) {
+    if (line.trim() === '') {
+      updatedLines.push(''); // Keep blank lines
+      continue;
+    }
+
+    const index = translatedLines.indexOf(line.trim());
+    if (index !== -1) {
+      updatedLines.push(translatedLines[index]); // Use existing translation
+    } else {
+      const newTranslation = await translateFn(line.trim());
+      updatedLines.push(newTranslation); // Translate missing line
+    }
+  }
+
+  return updatedLines.join('\n');
 }
 
 /**
@@ -77,22 +127,44 @@ async function processArticles() {
     return;
   }
 
+  // Step 1: Set isOriginal for single files
   for (const filePath of changedFiles) {
     const articlePath = path.dirname(filePath);
     const content = fs.readFileSync(filePath, 'utf-8');
     const { content: articleText, data: metadata } = grayMatter(content);
 
+    const allFilesInDirectory = fs.readdirSync(articlePath).filter(file => file.endsWith('.md'));
+    if (allFilesInDirectory.length === 1 && !metadata.isOriginal) {
+      metadata.isOriginal = true;
+      const updatedContent = grayMatter.stringify(articleText, metadata);
+      fs.writeFileSync(filePath, updatedContent);
+      console.log(`Set isOriginal: true for ${filePath}`);
+    }
+  }
+
+  // Step 2: Process original files and create translations
+  for (const filePath of changedFiles) {
+    const articlePath = path.dirname(filePath);
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const { content: articleText, data: metadata } = grayMatter(content);
+
+    if (!metadata.isOriginal) {
+      console.log(`Skipping translation file: ${filePath}`);
+      continue;
+    }
+
+    console.log(`Processing original file: ${filePath}`);
+
     const sourceLang = filePath.match(/_([a-z]{2})\.md$/i)?.[1]?.toUpperCase() || null;
 
-    console.log(`Processing file: ${filePath} (Source Language: ${sourceLang || 'Auto-detect'})`);
-
     for (const lang of targetLanguages) {
-      if (sourceLang && lang.toUpperCase() === sourceLang) {
+      if (sourceLang && lang.toUpperCase() === sourceLang.toUpperCase()) {
         console.log(`Skipping translation for ${lang}, as it matches the source language.`);
         continue;
       }
 
-      const newFileName = path.basename(filePath).replace(/_[a-z]{2}\.md$/i, `_${lang}.md`);
+      const targetLangFile = getKeyByValue(languageMapping, lang.toUpperCase());
+      const newFileName = path.basename(filePath).replace(/_[a-z]{2}\.md$/i, `_${targetLangFile}.md`);
       const newFilePath = path.join(articlePath, newFileName);
 
       let existingTranslatedText = '';
@@ -108,9 +180,18 @@ async function processArticles() {
       }
 
       try {
-        const translatedText = await translateText(untranslatedText, lang, sourceLang);
-        const updatedText = updateTranslation(articleText, existingTranslatedText, translatedText);
-        const newContent = grayMatter.stringify(updatedText, metadata);
+        // Translate metadata fields
+        const fieldsToTranslate = ['title', 'author'];
+        const translatedMetadata = await translateMetadata(metadata, fieldsToTranslate, lang, sourceLang);
+
+        // Synchronize translations with the original order
+        const updatedText = await synchronizeTranslations(
+          articleText,
+          existingTranslatedText,
+          async (line) => await translateText(line, lang, sourceLang)
+        );
+
+        const newContent = grayMatter.stringify(updatedText, { ...translatedMetadata, isOriginal: false });
 
         fs.writeFileSync(newFilePath, newContent);
         console.log(`Updated translation created: ${newFileName}`);
