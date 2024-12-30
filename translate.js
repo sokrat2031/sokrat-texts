@@ -42,6 +42,32 @@ function getChangedFiles() {
   }
 }
 
+/**
+ * Stage, commit, and push changes to the repository
+ * @param {string[]} filePaths - Array of file paths to commit
+ */
+function commitAndPushChanges(filePaths) {
+  try {
+    if (filePaths.length === 0) {
+      console.log('No files to commit.');
+      return;
+    }
+
+    // Add files to git
+    execSync(`git add ${filePaths.join(' ')}`);
+    console.log('Files added to git:', filePaths);
+
+    // Commit changes
+    execSync('git commit -m "Add translated articles"');
+    console.log('Commit created.');
+
+    // Push changes
+    execSync('git push');
+    console.log('Changes pushed to the repository.');
+  } catch (error) {
+    console.error('Failed to commit and push changes:', error);
+  }
+}
 
 
 /**
@@ -202,6 +228,7 @@ async function processArticles() {
         const newContent = grayMatter.stringify(updatedText, { ...translatedMetadata, isOriginal: false });
 
         fs.writeFileSync(newFilePath, newContent);
+        newFiles.push(newFilePath); // Track new files
         console.log(`Updated translation created: ${newFileName}`);
       } catch (error) {
         console.error(`Failed to process translation for ${filePath} to ${lang}.`, error);
