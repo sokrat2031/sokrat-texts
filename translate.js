@@ -28,13 +28,20 @@ function getKeyByValue(object, value) {
  */
 function getChangedFiles() {
   try {
-    const output = execSync('git diff-tree --no-commit-id --name-only -r HEAD').toString();
-    return output.split('\n').filter(file => file.endsWith('.md'));
+    const isGithubActions = process.env.GITHUB_SHA !== undefined;
+    if (isGithubActions) {
+      const output = execSync('git diff-tree --no-commit-id --name-only -r HEAD').toString();
+      return output.split('\n').filter(file => file.endsWith('.md'));
+    } else {
+      const output = execSync('git diff --cached --name-only').toString();
+      return output.split('\n').filter(file => file.endsWith('.md'));
+    }
   } catch (error) {
     console.error('Failed to get changed files from git:', error);
     return [];
   }
 }
+
 
 
 /**
