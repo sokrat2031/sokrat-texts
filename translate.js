@@ -30,7 +30,7 @@ function getChangedFiles() {
   try {
     const isGithubActions = process.env.GITHUB_SHA !== undefined;
     if (isGithubActions) {
-      const output = execSync('git diff --name-only origin/main..HEAD').toString();
+      const output = execSync('git diff-tree --no-commit-id --name-only -r HEAD').toString();;
       return output.split('\n').filter(file => file.endsWith('.md'));
     } else {
       const output = execSync('git diff --cached --name-only').toString();
