@@ -48,7 +48,7 @@ jobs:
           DEEPL_API_KEY: ${{ secrets.DEEPL_API_KEY }}
         run: node translate.js
 
-        - name: Push changes
+      - name: Push changes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
