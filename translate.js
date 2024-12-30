@@ -28,13 +28,14 @@ function getKeyByValue(object, value) {
  */
 function getChangedFiles() {
   try {
-    const output = execSync('git diff --name-only origin/main..HEAD').toString();
+    const output = execSync('git diff-tree --no-commit-id --name-only -r HEAD').toString();
     return output.split('\n').filter(file => file.endsWith('.md'));
   } catch (error) {
     console.error('Failed to get changed files from git:', error);
     return [];
   }
 }
+
 
 /**
  * Translate text using DeepL API
