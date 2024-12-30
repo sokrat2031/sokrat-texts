@@ -190,7 +190,8 @@ async function processArticles() {
     console.log(`Processing original file: ${filePath}`);
 
     const sourceLang = filePath.match(/_([a-z]{2})\.md$/i)?.[1]?.toUpperCase() || null;
-
+    const newFiles = []; 
+    
     for (const lang of targetLanguages) {
       if (sourceLang && lang.toUpperCase() === sourceLang.toUpperCase()) {
         console.log(`Skipping translation for ${lang}, as it matches the source language.`);
@@ -234,6 +235,7 @@ async function processArticles() {
         console.error(`Failed to process translation for ${filePath} to ${lang}.`, error);
       }
     }
+    commitAndPushChanges(newFiles);
   }
 
   console.log('All files processed!');
