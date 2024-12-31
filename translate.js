@@ -216,7 +216,7 @@ async function processArticles() {
 
       try {
         // Translate metadata fields
-        const fieldsToTranslate = ['title', 'author'];
+        const fieldsToTranslate = ['title', 'author', 'description'];
         const translatedMetadata = await translateMetadata(metadata, fieldsToTranslate, lang, sourceLang);
 
         // Synchronize translations with the original order
